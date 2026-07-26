@@ -42,6 +42,8 @@ INSERT INTO SALES (id, total, sale_date) VALUES
 (14, 949.98, CURRENT_TIMESTAMP()),
 (15, 1649.98, CURRENT_TIMESTAMP());
 
+ALTER TABLE SALES ALTER COLUMN ID RESTART WITH 16;
+
 INSERT INTO SALE_ITEMS (sale_id, product_id, quantity, unit_price, line_total) VALUES
 (1, 1, 1, 999.99, 999.99),
 (1, 13, 1, 279.99, 279.99),
