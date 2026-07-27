@@ -61,13 +61,15 @@ security.jwt.secret=example-jwt-secret-key-change-me
 
 ## 2. Lancer l'application avec Docker
 
+Assurez-vous que Docker Desktop est démarré avant d'exécuter les commandes suivantes:
+
 Construire l'image Docker :
 
 ```bash
 docker build -t shopwise-api .
 ```
 
-Lancer le conteneur (assurez-vous que Docker Desktop est démarré avant d'exécuter cette commande) :
+Lancer le conteneur:
 
 ```bash
 docker run --name shopwise-api -p 8080:8080 shopwise-api
