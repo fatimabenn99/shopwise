@@ -49,7 +49,7 @@ cd shopwise
 
 ### Configuration
 
-Avant de lancer l'application, il est nécessaire de renseigner une clé JWT dans les fichiers `application.properties` et `application-test.properties`.
+Avant de lancer l'application, il est nécessaire de renseigner une clé JWT dans les fichiers `application.properties` et `application-test.properties` dans le paramètre `security.jwt.secret` qui est vide dans les deux fichiers.
 
 Exemple de configuration :
 
