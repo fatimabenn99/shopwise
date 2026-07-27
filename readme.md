@@ -88,7 +88,7 @@ La console H2 est disponible à l’adresse :
 http://localhost:8080/h2-console
 ```
 
-Paramètres de connexion :
+Paramètres de connexion à la console H2:
 
 ```text
 JDBC URL : jdbc:h2:mem:shopwise
