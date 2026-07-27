@@ -24,6 +24,10 @@ INSERT INTO PRODUCTS (name, description, price, category, created_at, updated_at
 ('iPad Air', 'Apple tablet lightweight touch screen', 799.99, 'TABLET', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
 ('Galaxy Tab S10', 'Samsung Android tablet large screen', 749.99, 'TABLET', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
+INSERT INTO USERS (username, password, role) VALUES
+('admin', '$2a$10$4Zid0Xkkvc13zazFcYjlpum2SfOy.fbUYTjkY2mgjyTQvtkH3Fy1u', 'ROLE_ADMIN'),
+('user', '$2a$10$4Zid0Xkkvc13zazFcYjlpum2SfOy.fbUYTjkY2mgjyTQvtkH3Fy1u', 'ROLE_USER');
+
 INSERT INTO SALES (id, total, sale_date) VALUES
 (1, 1779.97, CURRENT_TIMESTAMP()),
 (2, 1279.98, CURRENT_TIMESTAMP()),
