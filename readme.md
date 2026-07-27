@@ -5,8 +5,6 @@
 - Présentation
 - Guide de lancement de l'application
 - Scénario de validation des API
-- Fonctionnalités principales
-- Technologies
 - Question 1 - Architecture du logiciel
 - Question 2 - Évolution du logiciel : module Vente
 - Question 3 - Amélioration de la qualité du logiciel
@@ -69,13 +67,13 @@ Construire l'image Docker :
 docker build -t shopwise-api .
 ```
 
-Lancer le conteneur :
+Lancer le conteneur (assurez-vous que Docker Desktop est démarré avant d'exécuter cette commande) :
 
 ```bash
 docker run --name shopwise-api -p 8080:8080 shopwise-api
 ```
 
-L'API est ensuite accessible à l'adresse :
+L'API est ensuite accessible à l'adresse via Insomnia ou Postman :
 
 ```text
 http://localhost:8080
@@ -122,6 +120,54 @@ docker rm shopwise-api
 Cette section montre comment vérifier manuellement les principales fonctionnalités avec Postman ou Insomnia.
 
 Les exemples présentés correspondent aux critères d'acceptation des user stories 1 à 8.
+
+
+## Comptes de démonstration
+
+L'application initialise automatiquement deux comptes de démonstration afin de faciliter les tests des fonctionnalités sécurisées.
+
+| Utilisateur | Mot de passe | Rôle |
+|-------------|--------------|------|
+| `admin` | `password123` | `ROLE_ADMIN` |
+| `user` | `password123` | `ROLE_USER` |
+
+### Pourquoi les nouveaux utilisateurs obtiennent-ils `ROLE_USER` ?
+
+Lors de l'inscription (`POST /api/auth/register`), tous les nouveaux utilisateurs reçoivent automatiquement le rôle `ROLE_USER`.
+
+Ce choix est volontaire et correspond à une bonne pratique de sécurité : un utilisateur ne doit jamais pouvoir choisir son propre rôle lors de son inscription. Autoriser la création directe d'un compte administrateur représenterait une faille de sécurité, puisqu'un utilisateur pourrait obtenir des privilèges élevés sans contrôle.
+
+Le rôle `ROLE_ADMIN` est réservé aux administrateurs de l'application et est attribué uniquement aux comptes créés lors de l'initialisation de la base de données.
+
+### Comment tester les fonctionnalités administrateur ?
+
+Pour tester les endpoints protégés réservés aux administrateurs, il suffit de s'authentifier avec le compte de démonstration `admin` :
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+```
+
+```json
+{
+  "username": "admin",
+  "password": "password123"
+}
+```
+
+La réponse contient un JWT qu'il faut transmettre dans l'en-tête `Authorization` :
+
+```http
+Authorization: Bearer <JWT>
+```
+
+Ce jeton permet notamment de tester les endpoints réservés à `ROLE_ADMIN`, tels que :
+
+- `POST /api/products`
+- `PUT /api/products/{id}`
+- `DELETE /api/products/{id}`
+
+Le compte `user` permet quant à lui de tester les fonctionnalités accessibles aux utilisateurs authentifiés, comme la consultation des ventes et des recommandations.
 
 ---
 
@@ -1584,9 +1630,7 @@ Les opérations d'administration du catalogue sont réservées aux administrateu
 
 ## Normalisation des réponses d'erreur
 
-Les erreurs sont centralisées grâce à `CustomExceptionHandler`.
-
-Les erreurs liées à l'authentification et à l'autorisation sont produites par `SecurityErrorResponse`.
+Les réponses d'erreur sont normalisées grâce à `CustomExceptionHandler` pour les exceptions applicatives et à `SecurityErrorResponse` pour les erreurs liées à Spring Security.
 
 Les principaux codes HTTP utilisés sont les suivants :
 
@@ -1666,12 +1710,12 @@ Contrairement à un modèle entraîné sur un jeu de données externe, les recom
 
 Pour un produit cible :
 
-1. le produit demandé est récupéré depuis le catalogue ;
-2. tous les autres produits sont considérés comme candidats ;
-3. plusieurs distances sont calculées entre le produit cible et chaque candidat ;
-4. ces distances sont combinées en une distance globale pondérée ;
-5. cette distance est convertie en un score de similarité ;
-6. les candidats sont triés selon leur score de similarité ;
+1. le produit demandé est récupéré depuis le catalogue;
+2. tous les autres produits sont considérés comme candidats;
+3. plusieurs mesures de similarité et de distance sont calculées entre le produit cible et chaque candidat;
+4. ces distances sont combinées en une distance globale pondérée;
+5. cette distance est convertie en un score de similarité;
+6. les candidats sont triés selon leur score de similarité;
 7. les cinq produits les plus pertinents sont retournés.
 
 Le calcul de la distance globale repose sur plusieurs critères pondérés :
@@ -1790,8 +1834,8 @@ Les tests permettent notamment de vérifier :
 - `SaleServiceTest`
 - `RecommendationServiceTest`
 - `JwtServiceTest`
-- `JwtAuthenticationFilterTest`
-- `GlobalExceptionHandlerTest`
+- `JwtAuthFilterTest`
+- `CustomExceptionHandlerTest`
 - `ProductMapperTest`
 - `SaleMapperTest`
 
