@@ -66,4 +66,12 @@ public class Sale {
         items.add(item);
         item.setSale(this);
     }
+    
+    public void clearItems() {
+        for (SaleItem item : items) {
+            item.setSale(null);
+        }
+
+        items.clear();
+    }
 }

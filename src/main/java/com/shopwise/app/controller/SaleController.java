@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.shopwise.app.dto.request.CreateSaleRequest;
+import com.shopwise.app.dto.request.UpdateSaleRequest;
 import com.shopwise.app.dto.response.SaleResponse;
 import com.shopwise.app.service.SaleService;
 
@@ -36,5 +37,13 @@ public class SaleController {
     @GetMapping("/{id}")
     public ResponseEntity<SaleResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(saleService.getById(id));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<SaleResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateSaleRequest request
+    ) {
+        return ResponseEntity.ok(saleService.update(id, request));
     }
 }

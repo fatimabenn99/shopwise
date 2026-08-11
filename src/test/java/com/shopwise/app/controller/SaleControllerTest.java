@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import com.shopwise.app.dto.request.CreateSaleRequest;
+import com.shopwise.app.dto.request.UpdateSaleRequest;
 import com.shopwise.app.dto.response.SaleResponse;
 import com.shopwise.app.service.SaleService;
 
@@ -79,4 +80,21 @@ class SaleControllerTest {
         assertEquals(10L, result.getBody().getId());
     }
 
+    @Test
+    void shouldUpdateSale() {
+        UpdateSaleRequest request = new UpdateSaleRequest();
+
+        SaleResponse response = new SaleResponse();
+        response.setId(1L);
+
+        when(saleService.update(1L, request)).thenReturn(response);
+
+        ResponseEntity<SaleResponse> result =
+                controller.update(1L, request);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertEquals(1L, result.getBody().getId());
+
+        verify(saleService).update(1L, request);
+    }
 }

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.shopwise.app.dto.request.CreateSaleItemRequest;
 import com.shopwise.app.dto.request.CreateSaleRequest;
+import com.shopwise.app.dto.request.UpdateSaleRequest;
 import com.shopwise.app.dto.response.SaleResponse;
 import com.shopwise.app.entity.Product;
 import com.shopwise.app.entity.Sale;
@@ -78,5 +79,39 @@ public class SaleServiceImpl implements SaleService {
                 .orElseThrow(() -> new NotFoundException("Sale not found"));
 
         return saleMapper.toResponse(sale);
+    }
+    
+    @Override
+    public SaleResponse update(Long id, UpdateSaleRequest request) {
+        Sale sale = saleRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Sale not found"));
+
+        sale.clearItems();
+
+        BigDecimal total = BigDecimal.ZERO;
+
+        for (CreateSaleItemRequest itemRequest : request.getItems()) {
+            Product product = productRepository.findById(itemRequest.getProductId())
+                    .orElseThrow(() -> new NotFoundException("Product not found"));
+
+            BigDecimal unitPrice = product.getPrice();
+            BigDecimal lineTotal = unitPrice.multiply(
+                    BigDecimal.valueOf(itemRequest.getQuantity())
+            );
+
+            SaleItem item = new SaleItem();
+            item.setProduct(product);
+            item.setQuantity(itemRequest.getQuantity());
+            item.setUnitPrice(unitPrice);
+            item.setLineTotal(lineTotal);
+
+            sale.addItem(item);
+            total = total.add(lineTotal);
+        }
+
+        sale.setTotal(total);
+
+        Sale updated = saleRepository.save(sale);
+        return saleMapper.toResponse(updated);
     }
 }

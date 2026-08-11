@@ -2,6 +2,7 @@ package com.shopwise.app.api;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -256,6 +257,293 @@ class SaleApiTest {
                 .andExpect(jsonPath("$.message").isNotEmpty());
     }
 
+    @Test
+    void shouldUpdateSaleForUserRole() throws Exception {
+        ProductResponse initialProduct = createProduct(
+                "Sale Update Initial Product",
+                "Produit initial",
+                "SALE_TEST",
+                "20.00"
+        );
+
+        ProductResponse replacementProduct = createProduct(
+                "Sale Update Replacement Product",
+                "Produit de remplacement",
+                "SALE_TEST",
+                "35.00"
+        );
+
+        String createBody = """
+                {
+                  "items": [
+                    {
+                      "productId": %d,
+                      "quantity": 1
+                    }
+                  ]
+                }
+                """.formatted(initialProduct.getId());
+
+        String createResponse = mockMvc.perform(post("/api/sales")
+                        .header(
+                                "Authorization",
+                                bearer(userToken())
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        com.fasterxml.jackson.databind.ObjectMapper objectMapper =
+                new com.fasterxml.jackson.databind.ObjectMapper();
+
+        Long saleId = objectMapper
+                .readTree(createResponse)
+                .get("id")
+                .asLong();
+
+        String updateBody = """
+                {
+                  "items": [
+                    {
+                      "productId": %d,
+                      "quantity": 2
+                    }
+                  ]
+                }
+                """.formatted(replacementProduct.getId());
+
+        mockMvc.perform(put(
+                        "/api/sales/{id}",
+                        saleId
+                )
+                        .header(
+                                "Authorization",
+                                bearer(userToken())
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateBody))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.id").value(saleId))
+                .andExpect(jsonPath("$.total").value(70.00))
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].productId")
+                        .value(replacementProduct.getId()))
+                .andExpect(jsonPath("$.items[0].quantity")
+                        .value(2))
+                .andExpect(jsonPath("$.items[0].unitPrice")
+                        .value(35.00))
+                .andExpect(jsonPath("$.items[0].lineTotal")
+                        .value(70.00));
+    }
+
+    @Test
+    void shouldRejectSaleUpdateWithoutToken() throws Exception {
+        mockMvc.perform(put(
+                        "/api/sales/{id}",
+                        1L
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {
+                                      "productId": 1,
+                                      "quantity": 1
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.code").value(401))
+                .andExpect(jsonPath("$.message")
+                        .value("Authentication required"));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenUpdatingUnknownSale() throws Exception {
+        ProductResponse product = createProduct(
+                "Unknown Sale Update Product",
+                "Produit valide",
+                "SALE_TEST",
+                "15.00"
+        );
+
+        String updateBody = """
+                {
+                  "items": [
+                    {
+                      "productId": %d,
+                      "quantity": 1
+                    }
+                  ]
+                }
+                """.formatted(product.getId());
+
+        mockMvc.perform(put(
+                        "/api/sales/{id}",
+                        999999L
+                )
+                        .header(
+                                "Authorization",
+                                bearer(userToken())
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateBody))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message")
+                        .value("Sale not found"));
+    }
+
+    @Test
+    void shouldRejectSaleUpdateWithInvalidQuantity() throws Exception {
+        ProductResponse product = createProduct(
+                "Invalid Sale Update Quantity Product",
+                "Produit pour modification invalide",
+                "SALE_TEST",
+                "10.00"
+        );
+
+        String createBody = """
+                {
+                  "items": [
+                    {
+                      "productId": %d,
+                      "quantity": 1
+                    }
+                  ]
+                }
+                """.formatted(product.getId());
+
+        String createResponse = mockMvc.perform(post("/api/sales")
+                        .header(
+                                "Authorization",
+                                bearer(userToken())
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        com.fasterxml.jackson.databind.ObjectMapper objectMapper =
+                new com.fasterxml.jackson.databind.ObjectMapper();
+
+        Long saleId = objectMapper
+                .readTree(createResponse)
+                .get("id")
+                .asLong();
+
+        String invalidBody = """
+                {
+                  "items": [
+                    {
+                      "productId": %d,
+                      "quantity": 0
+                    }
+                  ]
+                }
+                """.formatted(product.getId());
+
+        mockMvc.perform(put(
+                        "/api/sales/{id}",
+                        saleId
+                )
+                        .header(
+                                "Authorization",
+                                bearer(userToken())
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ));
+    }
+    
+    @Test
+    void shouldReturnNotFoundWhenUpdatingSaleWithUnknownProduct()
+            throws Exception {
+
+        ProductResponse product = createProduct(
+                "Sale Unknown Product Initial",
+                "Produit initial",
+                "SALE_TEST",
+                "20.00"
+        );
+
+        String createBody = """
+                {
+                  "items": [
+                    {
+                      "productId": %d,
+                      "quantity": 1
+                    }
+                  ]
+                }
+                """.formatted(product.getId());
+
+        String createResponse = mockMvc.perform(post("/api/sales")
+                        .header(
+                                "Authorization",
+                                bearer(userToken())
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        com.fasterxml.jackson.databind.ObjectMapper objectMapper =
+                new com.fasterxml.jackson.databind.ObjectMapper();
+
+        Long saleId = objectMapper
+                .readTree(createResponse)
+                .get("id")
+                .asLong();
+
+        mockMvc.perform(put(
+                        "/api/sales/{id}",
+                        saleId
+                )
+                        .header(
+                                "Authorization",
+                                bearer(userToken())
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {
+                                      "productId": 999999,
+                                      "quantity": 1
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message")
+                        .value("Product not found"));
+    }
+    
+    
+    
     private ProductResponse createProduct(
             String name,
             String description,
