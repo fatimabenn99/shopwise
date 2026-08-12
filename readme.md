@@ -141,6 +141,15 @@ Ce choix est volontaire et correspond à une bonne pratique de sécurité : un u
 
 Le rôle `ROLE_ADMIN` est réservé aux administrateurs de l'application et est attribué uniquement aux comptes créés lors de l'initialisation de la base de données.
 
+### Rôle de chaque utilisateur
+
+| Rôle | Autorisations principales |
+|---|---|
+| `ROLE_USER` | Consulter le catalogue public, créer/consulter/modifier les ventes et accéder aux recommandations |
+| `ROLE_ADMIN` | Dispose des mêmes accès aux ventes et recommandations, et peut en plus créer, modifier et supprimer les produits du catalogue |
+
+Le rôle `ROLE_USER` correspond à un utilisateur authentifié utilisant les fonctionnalités métier courantes de l'application. Le rôle `ROLE_ADMIN` dispose de privilèges supplémentaires pour administrer le catalogue de produits.
+
 ### Comment tester les fonctionnalités administrateur ?
 
 Pour tester les endpoints protégés réservés aux administrateurs, il suffit de s'authentifier avec le compte de démonstration `admin` :
@@ -349,7 +358,7 @@ Cette vérification confirme qu'une vente peut contenir plusieurs produits, que 
 
 ```http
 POST http://localhost:8080/api/sales
-Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{adminToken OU userToken}}
 Content-Type: application/json
 ```
 
@@ -418,7 +427,7 @@ Vérifications :
 
 ```http
 GET http://localhost:8080/api/sales
-Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{adminToken OU userToken}}
 ```
 
 ## Résultat attendu
@@ -478,7 +487,7 @@ Vérifications :
 
 ```http
 GET http://localhost:8080/api/sales/16
-Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{adminToken OU userToken}}
 ```
 
 
@@ -554,7 +563,7 @@ Exemple :
 
 # US 4 — Vérifier les autorisations
 
-La création de produits est réservée au rôle `ROLE_ADMIN`.
+La création et la modification de produits est réservée au rôle `ROLE_ADMIN`.
 
 ## Tentative avec un utilisateur non administrateur
 
@@ -598,6 +607,120 @@ Vérification :
 - le produit n'est pas créé ;
 - le statut HTTP est `403` ;
 - la réponse contient un message explicite.
+
+
+## Modifier une vente avec un utilisateur autorisé
+
+La modification d'une vente est accessible aux rôles `ROLE_USER` et `ROLE_ADMIN`.
+
+### Requête
+
+```http
+PUT http://localhost:8080/api/sales/15
+Authorization: Bearer {{adminToken OU userToken}}
+Content-Type: application/json
+```
+
+Corps :
+
+```json
+{
+    "items": [
+        {
+            "productId": 1,
+            "quantity": 2
+        },
+        {
+            "productId": 3,
+            "quantity": 1
+        }
+    ]
+}
+```
+
+Le client transmet uniquement les identifiants des produits et les quantités. Les prix unitaires sont récupérés depuis le catalogue et les montants sont recalculés automatiquement.
+
+### Résultat attendu
+
+```text
+200 OK
+```
+
+Exemple :
+
+```json
+{
+    "id": 15,
+    "items": [
+        {
+            "lineTotal": 1999.98,
+            "productId": 1,
+            "productName": "iPhone 15",
+            "quantity": 2,
+            "unitPrice": 999.99
+        },
+        {
+            "lineTotal": 1399.99,
+            "productId": 3,
+            "productName": "iPhone 15 Pro",
+            "quantity": 1,
+            "unitPrice": 1399.99
+        }
+    ],
+    "saleDate": "2026-07-28T20:32:38.721763",
+    "total": 3399.97
+}
+```
+
+Vérifications :
+
+- la vente conserve son identifiant ;
+- la date initiale de la vente est conservée ;
+- les anciennes lignes sont remplacées ;
+- les prix proviennent du catalogue ;
+- les montants des lignes sont recalculés ;
+- le montant total de la vente est recalculé.
+
+## Tentative de modification d'une vente sans authentification
+
+### Requête
+
+```http
+PUT http://localhost:8080/api/sales/15
+Content-Type: application/json
+```
+
+Corps :
+
+```json
+{
+    "items": [
+        {
+            "productId": 1,
+            "quantity": 1
+        }
+    ]
+}
+```
+
+Ne pas renseigner l'en-tête `Authorization`.
+
+### Résultat attendu
+
+```text
+401 Unauthorized
+```
+
+Exemple :
+
+```json
+{
+    "code": 401,
+    "message": "Authentication required",
+    "timestamp": "2026-07-28T20:35:00"
+}
+```
+
 
 ---
 
@@ -889,6 +1012,8 @@ Exemple :
 | US 3 | Consultation du détail d'une vente | `200 OK` |
 | US 3 | Consultation d'une vente inexistante | `404 Not Found` |
 | US 4 | Création d'un produit avec `ROLE_USER` | `403 Forbidden` |
+| US 4 | Modification d'une vente avec `ROLE_USER` ou `ROLE_ADMIN` | `200 OK` |
+| US 4 / US 5 | Modification d'une vente sans JWT | `401 Unauthorized` |
 | US 5 | Route protégée sans JWT | `401 Unauthorized` |
 | US 5 | Route protégée avec JWT invalide | `401 Unauthorized` |
 | US 6 | Requête métier invalide | `400 Bad Request` |
@@ -945,7 +1070,7 @@ flowchart TB
     end
 
     subgraph DTO["DTO et validation"]
-        RequestDTO["DTO Request<br/>RegisterRequest<br/>LoginRequest<br/>CreateProductRequest<br/>UpdateProductRequest<br/>CreateSaleRequest"]
+        RequestDTO["DTO Request<br/>RegisterRequest<br/>LoginRequest<br/>CreateProductRequest<br/>UpdateProductRequest<br/>CreateSaleRequest<br/>UpdateSaleRequest"]
         ResponseDTO["DTO Response<br/>LoginResponse<br/>RegisterResponse<br/>ProductResponse<br/>SaleResponse<br/>RecommendationResponse<br/>ErrorResponse"]
         Validation["Jakarta Validation"]
     end
@@ -1121,9 +1246,24 @@ SaleItem
 Il est responsable :
 
 - de la gestion des ventes ;
-- de la création et de la consultation des ventes ;
+- de la création, de la consultation et de la modification des ventes ;
 - de la gestion des lignes de vente ;
 - de l'interaction avec le catalogue afin d'exploiter les informations des produits lors d'une vente.
+
+### Gestion des ventes
+
+Le module Ventes permet :
+
+- d’enregistrer une vente contenant un ou plusieurs produits ;
+- de calculer automatiquement le montant de chaque ligne ;
+- de calculer automatiquement le montant total de la vente ;
+- de consulter l’ensemble des ventes ;
+- de consulter une vente par son identifiant ;
+- de modifier les produits et les quantités d’une vente existante.
+
+Lors de la création ou de la modification d’une vente, les prix ne sont pas fournis par le client. Ils sont récupérés depuis le catalogue afin de garantir l’intégrité des données.
+
+Lorsqu’une vente est modifiée, ses anciennes lignes sont remplacées par les nouvelles lignes reçues. Les montants de chaque ligne et le total de la vente sont ensuite recalculés automatiquement.
 
 ---
 
@@ -1315,9 +1455,10 @@ L'analyse des user stories a conduit aux besoins suivants :
 - calculer automatiquement le montant total de la vente ;
 - consulter une vente par son identifiant ;
 - consulter l'ensemble des ventes ;
+- modifier les produits et les quantités d'une vente existante ;
 - protéger les endpoints grâce à Spring Security et JWT.
 
-Le module Vente réutilise directement le module Catalogue via `ProductRepository`. Cette dépendance permet de vérifier qu'un produit existe avant de créer une vente et garantit que le prix utilisé correspond au prix enregistré dans le catalogue.
+Le module Vente réutilise directement le module Catalogue via `ProductRepository`. Cette dépendance permet de vérifier qu'un produit existe lors de la création ou de la modification d'une vente et garantit que le prix utilisé correspond au prix enregistré dans le catalogue.
 
 ---
 
@@ -1351,7 +1492,7 @@ Les responsabilités sont réparties comme suit :
 | Sale | Représenter une vente |
 | SaleItem | Représenter une ligne de vente |
 
-Les lignes de vente ne sont pas enregistrées directement par `SaleItemRepository`. Elles sont associées à la vente grâce à la méthode `addItem()` de l'entité `Sale`, puis automatiquement persistées lors de l'enregistrement de la vente via `SaleRepository`. Cette persistance est assurée par la relation `OneToMany` configurée avec `CascadeType.ALL`, ce qui garantit la cohérence entre une vente et ses lignes.
+Les lignes de vente sont associées à la vente grâce à la méthode `addItem()` de l'entité `Sale`. La relation `OneToMany` utilise `CascadeType.ALL`, ce qui permet de persister les lignes en même temps que la vente, ainsi que `orphanRemoval = true`, ce qui permet de supprimer automatiquement les anciennes lignes retirées lors de la modification d'une vente.
 
 ---
 
@@ -1504,6 +1645,7 @@ Le module Vente expose les endpoints suivants :
 | GET | `/api/sales` | Liste des ventes | ROLE_USER / ROLE_ADMIN |
 | GET | `/api/sales/{id}` | Détail d'une vente | ROLE_USER / ROLE_ADMIN |
 | POST | `/api/sales` | Création d'une vente | ROLE_USER / ROLE_ADMIN |
+| PUT | `/api/sales/{id}` | Modifie les lignes d’une vente et recalcule son total | ROLE_USER / ROLE_ADMIN |
 
 ### Exemple de création
 
@@ -1534,6 +1676,22 @@ Lors de la création d'une vente, le backend :
 
 Les ventes sont retournées de la plus récente à la plus ancienne.
 
+### Modification d'une vente
+
+Lors de la modification d'une vente, le backend :
+
+1. vérifie que la vente existe ;
+2. valide les nouvelles lignes reçues ;
+3. vérifie que chaque produit existe dans le catalogue ;
+4. récupère les prix actuels des produits ;
+5. remplace les anciennes lignes de la vente ;
+6. recalcule les montants de chaque ligne ;
+7. recalcule le montant total de la vente ;
+8. conserve l'identifiant et la date initiale de la vente ;
+9. persiste la vente mise à jour.
+
+Grâce à `orphanRemoval = true`, les anciennes lignes qui ne sont plus associées à la vente sont automatiquement supprimées de la base de données.
+
 ## Pérennité et évolutivité du module
 
 Le module Vente reprend les conventions de l’application existante : séparation entre contrôleur, service, repository, mapper, DTO et entités. Cette homogénéité facilite sa compréhension et sa reprise par un autre développeur.
@@ -1551,7 +1709,7 @@ Le module Vente a été intégré à l’architecture existante en respectant le
 Cette évolution comprend :
 
 - un nouveau modèle de données composé des entités `Sale` et `SaleItem` ;
-- une API REST permettant de créer et de consulter les ventes ;
+- une API REST permettant de créer, consulter et modifier les ventes ;
 - une logique métier transactionnelle assurant le calcul et la cohérence des montants ;
 - une persistance avec Spring Data JPA ;
 - une intégration maîtrisée avec le catalogue de produits ;
@@ -1569,7 +1727,7 @@ L'analyse des user stories 4 à 6 met en évidence plusieurs exigences de sécur
 
 - empêcher un utilisateur non authentifié d'accéder aux fonctionnalités protégées ;
 - limiter certaines opérations aux administrateurs ;
-- garantir que seules les personnes autorisées puissent modifier les données ;
+- garantir que seules les personnes autorisées puissent accéder aux opérations sensibles et modifier les données lorsqu'une opération de modification est disponible ;
 - fournir des réponses d'erreur cohérentes et compréhensibles.
 
 Afin de répondre à ces exigences, l'API a été sécurisée avec Spring Security et un mécanisme d'authentification par jeton JWT.
@@ -1594,6 +1752,7 @@ Les opérations de consultation du catalogue sont publiques, tandis que les opé
 | GET `/api/sales` | ROLE_USER / ROLE_ADMIN |
 | GET `/api/sales/{id}` | ROLE_USER / ROLE_ADMIN |
 | POST `/api/sales` | ROLE_USER / ROLE_ADMIN |
+| PUT `/api/sales/{id}` | ROLE_USER / ROLE_ADMIN |
 | GET `/api/recommendations/**` | ROLE_USER / ROLE_ADMIN |
 
 Cette séparation permet de protéger les ressources sensibles tout en conservant un accès public au catalogue.
@@ -1626,7 +1785,16 @@ Deux rôles sont utilisés :
 - `ROLE_USER`
 - `ROLE_ADMIN`
 
-Les opérations d'administration du catalogue sont réservées aux administrateurs, tandis que les ventes et les recommandations sont accessibles à tous les utilisateurs authentifiés.
+La création, la consultation et la modification des ventes, ainsi que les recommandations, sont accessibles aux utilisateurs authentifiés disposant du rôle `ROLE_USER` ou `ROLE_ADMIN`.
+
+
+### Sécurisation du module Vente
+
+Les endpoints du module Vente nécessitent une authentification JWT.
+
+Les rôles `ROLE_USER` et `ROLE_ADMIN` peuvent créer, consulter et modifier les ventes. Une requête sans jeton valide est rejetée avec le statut `401 Unauthorized`.
+
+Les contrôles de sécurité sont appliqués avant l'exécution de la logique métier. Ainsi, une tentative non authentifiée de modification d'une vente est rejetée avant l'accès au contrôleur et au service.
 
 ---
 
@@ -1651,7 +1819,7 @@ Toutes les erreurs utilisent le même format JSON :
 {
     "code": 404,
     "message": "Product not found",
-    "timestamp": "2026-01-01T10:00:00"
+    "timestamp": "2026-07-01T10:00:00"
 }
 ```
 
@@ -1665,7 +1833,7 @@ Afin de répondre aux exigences de sécurité des user stories 4 à 6, plusieurs
 
 - **Spring Security** a été choisi car il constitue le framework de référence de l'écosystème Spring pour la sécurisation des applications. Son intégration native avec Spring Boot permet de mettre en place un mécanisme d'authentification et d'autorisation robuste tout en limitant le développement de composants de sécurité spécifiques.
 
-- **JWT (JSON Web Token)** a été retenu afin de mettre en œuvre une authentification stateless. Ce choix évite de conserver une session côté serveur : chaque requête transporte un jeton signé permettant de vérifier l'identité de l'utilisateur, ce qui est particulièrement adapté à une API REST.
+- **JWT (JSON Web Token)** a été retenu afin de mettre en oeuvre une authentification stateless. Ce choix évite de conserver une session côté serveur : chaque requête transporte un jeton signé permettant de vérifier l'identité de l'utilisateur, ce qui est particulièrement adapté à une API REST.
 
 - **BCrypt** a été choisi pour protéger les mots de passe en les stockant sous forme de hash plutôt qu'en clair. Ce choix renforce la sécurité des comptes utilisateurs en cas d'accès non autorisé à la base de données.
 
@@ -1698,7 +1866,7 @@ Le module de recommandation repose donc sur deux sources de données :
 - le catalogue de produits (`Product`) ;
 - l'historique des ventes (`Sale` et `SaleItem`).
 
-L'objectif n'est pas de proposer un classement des meilleures ventes ("best-sellers"), mais de recommander les produits les plus proches d'un produit cible selon leurs caractéristiques et le comportement d'achat observé.
+L'objectif n'est pas de proposer un classement des meilleures ventes, mais de recommander les produits les plus proches d'un produit cible selon leurs caractéristiques et le comportement d'achat observé.
 
 Le module expose également un point d'accès REST permettant de récupérer les recommandations calculées à partir de ces données.
 
@@ -1750,6 +1918,10 @@ GET /api/recommendations/products/{productId}
 ```
 
 Cet endpoint reçoit l'identifiant d'un produit et retourne les recommandations calculées par le moteur de recommandation sous forme de réponse JSON.
+
+### Évolutions possibles du moteur de recommandation
+
+Le moteur de recommandation pourrait évoluer en ajustant automatiquement les pondérations utilisées dans le calcul de similarité à partir d'un historique de ventes plus important. Il pourrait également intégrer de nouvelles données, comme les profils utilisateurs ou les catégories fréquemment consultées. À plus long terme, l'approche actuelle pourrait être comparée à d'autres méthodes de recommandation afin d'évaluer leur pertinence sur un volume de données plus important.
 
 ---
 
@@ -1818,8 +1990,9 @@ La stratégie de tests couvre les fonctionnalités historiques ainsi que les nou
 Les tests permettent notamment de vérifier :
 
 - les opérations CRUD du catalogue ;
-- les calculs des ventes ;
-- la persistance des données ;
+- la création et la modification des ventes ;
+- le remplacement des lignes lors de la modification d'une vente ;
+- le recalcul des montants après modification ;
 - la génération et la validation des jetons JWT ;
 - les droits associés aux rôles utilisateur et administrateur ;
 - le fonctionnement du moteur de recommandation ;
@@ -1888,8 +2061,15 @@ Ces tests garantissent que les fonctionnalités historiques du catalogue restent
 Exécuter l'ensemble des tests :
 
 ```bash
-mvn clean test
+mvn clean verify
 ```
+
+Cette commande exécute l'ensemble des tests, génère le rapport de couverture JaCoCo et vérifie le respect des seuils de couverture configurés dans le `pom.xml`.
+
+Le rapport HTML de couverture est ensuite disponible dans :
+
+`target/site/jacoco/index.html`
+
 
 Exécuter uniquement les tests d'intégration :
 
@@ -1930,7 +2110,7 @@ Le projet ShopWise a évolué progressivement afin de répondre aux différentes
 
 Les évolutions apportées comprennent :
 
-- l'ajout d'un module de gestion des ventes ;
+- l'ajout d'un module permettant la création, la consultation et la modification des ventes ;
 - la sécurisation complète de l'API avec Spring Security et JWT ;
 - l'intégration d'un moteur de recommandation basé sur une approche inspirée des K plus proches voisins ;
 - une stratégie de tests couvrant les différents niveaux de validation de l'application.
